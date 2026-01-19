@@ -636,7 +636,7 @@ func (ta *tarWriter) prepareAddFile(path, name string) (*addFileData, error) {
 	if err := readUserXattrToTarHeader(path, hdr); err != nil {
 		return nil, err
 	}
-	if err := ReadFileFlagsToTarHeader(path, hdr); err != nil {
+	if err := readFileFlagsToTarHeader(fi, hdr); err != nil {
 		return nil, err
 	}
 	if ta.CopyPass {
