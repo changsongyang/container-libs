@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -141,7 +142,11 @@ func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whit
 		changedDirs = make(map[string]struct{})
 	)
 
-	err := filepath.Walk(rw, func(path string, f os.FileInfo, err error) error {
+	err := filepath.WalkDir(rw, func(path string, dirEntry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		f, err := dirEntry.Info()
 		if err != nil {
 			return err
 		}
