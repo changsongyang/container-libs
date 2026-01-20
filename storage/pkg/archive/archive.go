@@ -521,9 +521,21 @@ type TarWhiteoutHandler interface {
 }
 
 type TarWhiteoutConverter interface {
+	// There is no documented way to call GetWhiteoutConverter. Consider this deprecated.
+	// Do not add any more public methods; if unavoidable, add them to the private tarWhiteoutConverter.
+
 	ConvertWrite(*tar.Header, string, os.FileInfo) (*tar.Header, error)
 	ConvertRead(*tar.Header, string) (bool, error)
 	ConvertReadWithHandler(*tar.Header, string, TarWhiteoutHandler) (bool, error)
+}
+
+type tarWhiteoutConverter interface {
+	TarWhiteoutConverter
+}
+
+// GetWhiteoutConverter has no documented way to be called externally. Do not add any users outside of c/storage.
+func GetWhiteoutConverter(format WhiteoutFormat, data any) TarWhiteoutConverter {
+	return getWhiteoutConverter(format, data)
 }
 
 type tarWriter struct {
@@ -539,7 +551,7 @@ type tarWriter struct {
 	// non standard format. The whiteout files defined
 	// by the AUFS standard are used as the tar whiteout
 	// standard.
-	WhiteoutConverter TarWhiteoutConverter
+	whiteoutConverter tarWhiteoutConverter
 	// CopyPass indicates that the contents of any archive we're creating
 	// will instantly be extracted and written to disk, so we can deviate
 	// from the traditional behavior/format to get features like subsecond
@@ -682,8 +694,8 @@ func (ta *tarWriter) prepareAddFile(path, name string) (*addFileData, error) {
 		hdr:  hdr,
 		fi:   fi,
 	}
-	if ta.WhiteoutConverter != nil {
-		// The WhiteoutConverter suggests a generic mechanism,
+	if ta.whiteoutConverter != nil {
+		// The whiteoutConverter suggests a generic mechanism,
 		// but this code is only used to convert between
 		// overlayfs (on-disk) and AUFS (in the tar file)
 		// whiteouts, and is initiated because the overlayfs
@@ -694,7 +706,7 @@ func (ta *tarWriter) prepareAddFile(path, name string) (*addFileData, error) {
 		// should be represented as a directory containing a
 		// magic whiteout empty regular file, hence the
 		// extraWhiteout header returned here.
-		result.extraWhiteout, err = ta.WhiteoutConverter.ConvertWrite(hdr, path, fi)
+		result.extraWhiteout, err = ta.whiteoutConverter.ConvertWrite(hdr, path, fi)
 		if err != nil {
 			return nil, err
 		}
@@ -969,7 +981,7 @@ func tarWithOptionsTo(dest io.Writer, srcPath string, options *TarOptions) (resu
 		options.ChownOpts,
 		options.Timestamp,
 	)
-	ta.WhiteoutConverter = GetWhiteoutConverter(options.WhiteoutFormat, options.WhiteoutData)
+	ta.whiteoutConverter = getWhiteoutConverter(options.WhiteoutFormat, options.WhiteoutData)
 	ta.CopyPass = options.CopyPass
 
 	includeFiles := options.IncludeFiles
