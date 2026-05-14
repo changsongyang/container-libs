@@ -136,7 +136,7 @@ type (
 	whiteoutChange func(string, string) (bool, error)
 )
 
-func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whiteoutChange) ([]Change, error) {
+func changes(layers []string, rw string, deleteConverter deleteChange, skipCondition skipChange, whiteoutChecker whiteoutChange) ([]Change, error) {
 	var (
 		changes     []Change
 		changedDirs = make(map[string]struct{})
@@ -165,8 +165,8 @@ func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whit
 			return nil
 		}
 
-		if sc != nil {
-			if skip, err := sc(path); skip {
+		if skipCondition != nil {
+			if skip, err := skipCondition(path); skip {
 				return err
 			}
 		}
@@ -175,7 +175,7 @@ func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whit
 			Path: path,
 		}
 
-		deletedFile, err := dc(rw, path, f)
+		deletedFile, err := deleteConverter(rw, path, f)
 		if err != nil {
 			return err
 		}
@@ -191,10 +191,10 @@ func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whit
 			// ...Unless it already existed in a top layer, in which case, it's a modification
 		layerScan:
 			for _, layer := range layers {
-				if wc != nil {
+				if whiteoutChecker != nil {
 					// ...Unless a lower layer also had whiteout for this directory or one of its parents,
 					// in which case, it's new
-					ignore, err := wc(layer, path)
+					ignore, err := whiteoutChecker(layer, path)
 					if err != nil {
 						return err
 					}
@@ -202,7 +202,7 @@ func changes(layers []string, rw string, dc deleteChange, sc skipChange, wc whit
 						break layerScan
 					}
 					for dir := filepath.Dir(path); dir != "" && dir != string(os.PathSeparator); dir = filepath.Dir(dir) {
-						ignore, err = wc(layer, dir)
+						ignore, err = whiteoutChecker(layer, dir)
 						if err != nil {
 							return err
 						}
