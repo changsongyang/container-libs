@@ -891,7 +891,7 @@ func TestUntarSelinuxLabel(t *testing.T) {
 			},
 		},
 	} {
-		if err := testBreakout(t, "untar", headers); err != nil {
+		if err := testBreakout(t, breakoutUntar, headers); err != nil {
 			t.Fatalf("i=%d. %v", i, err)
 		}
 	}
@@ -919,7 +919,7 @@ func TestUntarInvalidFilenames(t *testing.T) {
 			},
 		},
 	} {
-		if err := testBreakout(t, "untar", headers); err != nil {
+		if err := testBreakout(t, breakoutUntar, headers); err != nil {
 			t.Fatalf("i=%d. %v", i, err)
 		}
 	}
@@ -951,7 +951,7 @@ func TestUntarHardlinkToSymlink(t *testing.T) {
 			},
 		},
 	} {
-		if err := testBreakout(t, "untar", headers); err != nil {
+		if err := testBreakout(t, breakoutUntar, headers); err != nil {
 			t.Fatalf("i=%d. %v", i, err)
 		}
 	}
@@ -1035,7 +1035,7 @@ func TestUntarInvalidHardlink(t *testing.T) {
 			},
 		},
 	} {
-		if err := testBreakout(t, "untar", headers); err != nil {
+		if err := testBreakout(t, breakoutUntar, headers); err != nil {
 			t.Fatalf("i=%d. %v", i, err)
 		}
 	}
@@ -1133,7 +1133,7 @@ func TestUntarInvalidSymlink(t *testing.T) {
 			},
 		},
 	} {
-		if err := testBreakout(t, "untar", headers); err != nil {
+		if err := testBreakout(t, breakoutUntar, headers); err != nil {
 			t.Fatalf("i=%d. %v", i, err)
 		}
 	}
