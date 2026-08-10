@@ -12,7 +12,8 @@ import (
 
 // Usage of an empty directory should be 0
 func TestUsageEmpty(t *testing.T) {
-	usage, _ := Usage(t.TempDir())
+	usage, err := Usage(t.TempDir())
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "empty directory", usage, &DiskUsage{
 		Size:       0,
 		InodeCount: 1,
@@ -29,7 +30,8 @@ func TestUsageEmptyFile(t *testing.T) {
 		t.Fatalf("failed to create file: %s", err)
 	}
 
-	usage, _ := Usage(file.Name())
+	usage, err := Usage(file.Name())
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "one file", usage, &DiskUsage{
 		Size:       0,
 		InodeCount: 1,
@@ -44,7 +46,8 @@ func TestUsageNonemptyFile(t *testing.T) {
 	err := os.WriteFile(file, []byte{97, 98, 99, 100, 101}, 0o644)
 	require.NoError(t, err)
 
-	usage, _ := Usage(dir)
+	usage, err := Usage(dir)
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "directory with one 5-byte file", usage, &DiskUsage{
 		Size:       5,
 		InodeCount: 2,
@@ -53,7 +56,8 @@ func TestUsageNonemptyFile(t *testing.T) {
 
 // Usage of an empty directory should be 0
 func TestUsageEmptyDirectory(t *testing.T) {
-	usage, _ := Usage(t.TempDir())
+	usage, err := Usage(t.TempDir())
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "one directory", usage, &DiskUsage{
 		Size:       0,
 		InodeCount: 1,
@@ -67,7 +71,8 @@ func TestUsageNestedDirectoryEmpty(t *testing.T) {
 		t.Fatalf("failed to create nested directory: %s", err)
 	}
 
-	usage, _ := Usage(dir)
+	usage, err := Usage(dir)
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "directory with one empty directory", usage, &DiskUsage{
 		Size:       0,
 		InodeCount: 2,
@@ -87,7 +92,8 @@ func TestUsageFileAndNestedDirectoryEmpty(t *testing.T) {
 	err = os.WriteFile(file, []byte{100, 111, 99, 107, 101, 114}, 0o644)
 	require.NoError(t, err)
 
-	usage, _ := Usage(dir)
+	usage, err := Usage(dir)
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "directory with 6-byte file and empty directory", usage, &DiskUsage{
 		Size:       6,
 		InodeCount: 3,
@@ -112,7 +118,8 @@ func TestUsageFileAndNestedDirectoryNonempty(t *testing.T) {
 	err = os.WriteFile(nestedFile, []byte{100, 111, 99, 107, 101, 114}, 0o644)
 	require.NoError(t, err)
 
-	usage, _ := Usage(dir)
+	usage, err := Usage(dir)
+	require.NoError(t, err)
 	expectSizeAndInodeCount(t, "directory with 6-byte file and nested directory with 6-byte file", usage, &DiskUsage{
 		Size:       12,
 		InodeCount: 4,
