@@ -3,6 +3,7 @@ package archive
 import (
 	"archive/tar"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -622,7 +623,7 @@ func tarUntar(t *testing.T, origin string, options *TarOptions) ([]Change, error
 		return nil, err
 	}
 
-	return ChangesDirs(origin, &idtools.IDMappings{}, tmp, &idtools.IDMappings{})
+	return ChangesDirs(tmp, &idtools.IDMappings{}, origin, &idtools.IDMappings{})
 }
 
 func TestTarUntar(t *testing.T) {
@@ -710,36 +711,103 @@ func TestTarWithOptions(t *testing.T) {
 		t.Skip("Failing on Windows")
 	}
 	origin := t.TempDir()
-	if _, err := os.MkdirTemp(origin, "folder"); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(origin, "1"), []byte("hello world"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(origin, "2"), []byte("welcome!"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	populateDir(t, origin, time.Now(), []sampleData{
+		{Dir, "folder", "", 0o755},
+		{Regular, "1", "hello world", 0o700},
+		{Regular, "2", "welcome!", 0o700},
+		{Dir, "folder2", "", 0o700},
+		{Regular, "folder2/1", "in folder2", 0o700},
+		{Dir, "folder2/subfolder", "", 0o700},
+		{Regular, "folder2/subfolder/sub", "in subfolder", 0o700},
+		{Dir, "folder2/subfolder2", "", 0o700},
+	})
 
 	cases := []struct {
-		opts       *TarOptions
-		numChanges int
+		opts    *TarOptions
+		changes []Change
 	}{
-		{&TarOptions{IncludeFiles: []string{"1"}}, 2},
-		{&TarOptions{ExcludePatterns: []string{"2"}}, 1},
-		{&TarOptions{ExcludePatterns: []string{"1", "folder*"}}, 2},
-		{&TarOptions{IncludeFiles: []string{"1", "1"}}, 2},
-		{&TarOptions{IncludeFiles: []string{"1"}, RebaseNames: map[string]string{"1": "test"}}, 4},
+		{&TarOptions{IncludeFiles: []string{"."}}, []Change{}},
+		{&TarOptions{IncludeFiles: []string{"./"}}, []Change{}},
+		{&TarOptions{IncludeFiles: []string{"/"}}, []Change{}},
+		{&TarOptions{IncludeFiles: []string{"/."}}, []Change{}},
+		{&TarOptions{IncludeFiles: []string{"1"}}, []Change{
+			{Path: "/2", Kind: ChangeDelete},
+			{Path: "/folder", Kind: ChangeDelete},
+			{Path: "/folder2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{IncludeFiles: []string{"/1"}}, []Change{
+			{Path: "/2", Kind: ChangeDelete},
+			{Path: "/folder", Kind: ChangeDelete},
+			{Path: "/folder2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{ExcludePatterns: []string{"2"}}, []Change{
+			{Path: "/2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{ExcludePatterns: []string{"1", "folder*"}}, []Change{
+			{Path: "/1", Kind: ChangeDelete},
+			{Path: "/folder", Kind: ChangeDelete},
+			{Path: "/folder2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{IncludeFiles: []string{"1", "1"}}, []Change{
+			{Path: "/2", Kind: ChangeDelete},
+			{Path: "/folder", Kind: ChangeDelete},
+			{Path: "/folder2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{IncludeFiles: []string{"1"}, RebaseNames: map[string]string{"1": "test"}}, []Change{
+			{Path: "/1", Kind: ChangeDelete},
+			{Path: "/2", Kind: ChangeDelete},
+			{Path: "/folder", Kind: ChangeDelete},
+			{Path: "/test", Kind: ChangeAdd},
+			{Path: "/folder2", Kind: ChangeDelete},
+		}},
+		{&TarOptions{ExcludePatterns: []string{"folder2", "!folder2/subfolder"}}, []Change{
+			{Path: "/folder2", Kind: ChangeModify}, // folder2 is excluded, but Untar must create the parent — so it creates it using default values
+			{Path: "/folder2/1", Kind: ChangeDelete},
+			{Path: "/folder2/subfolder2", Kind: ChangeDelete},
+		}},
 	}
 	for _, testCase := range cases {
 		changes, err := tarUntar(t, origin, testCase.opts)
 		if err != nil {
 			t.Fatalf("Error tar/untar when testing inclusion/exclusion: %s", err)
 		}
-		if len(changes) != testCase.numChanges {
-			t.Errorf("Expected %d changes, got %d for %+v:",
-				testCase.numChanges, len(changes), testCase.opts)
-		}
+		assert.ElementsMatch(t, testCase.changes, changes)
 	}
+}
+
+func TestTarWithOptionsWildcardNegation(t *testing.T) {
+	if runtime.GOOS == windows {
+		t.Skip("Failing on Windows")
+	}
+
+	tmpDirPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDirPath, "cmd", "app"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDirPath, "cmd", "main.go"), []byte("package main"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDirPath, "cmd", "app", "app.go"), []byte("package app"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDirPath, "cmd", "main.txt"), []byte("text"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDirPath, "README.md"), []byte("readme"), 0o644))
+
+	archive, err := TarWithOptions(tmpDirPath, &TarOptions{
+		ExcludePatterns: []string{"*", "!**/*.go"},
+	})
+	require.NoError(t, err)
+	defer archive.Close()
+
+	found := make(map[string]bool)
+	tr := tar.NewReader(archive)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		found[hdr.Name] = true
+	}
+
+	assert.True(t, found["cmd/main.go"], "cmd/main.go should be included by !**/*.go")
+	assert.True(t, found["cmd/app/app.go"], "cmd/app/app.go should be included by !**/*.go")
+	assert.False(t, found["cmd/main.txt"], "cmd/main.txt should remain excluded")
+	assert.False(t, found["README.md"], "README.md should remain excluded")
 }
 
 // Some tar archives such as http://haproxy.1wt.eu/download/1.5/src/devel/haproxy-1.5-dev21.tar.gz
@@ -1303,4 +1371,82 @@ func TestTarErrorHandling(t *testing.T) {
 	}); !errors.Is(err, dest.err) {
 		t.Fatalf("Did not propagate error; got %v", err)
 	}
+}
+
+// makeVfsCap builds a "security.capability" value of the given revision. When
+// rootid is >= 0 a v3 value (24 bytes) is produced, otherwise a v2 value (20
+// bytes). The permitted/inheritable sets and effective flag are stored so the
+// test can check they survive normalization.
+func makeVfsCap(rootid int) []byte {
+	magic := uint32(vfsCapRevision2)
+	size := vfsCapDataSizeV2
+	if rootid >= 0 {
+		magic = vfsCapRevision3
+		size = vfsCapDataSizeV3
+	}
+	magic |= 0x01 // VFS_CAP_FLAGS_EFFECTIVE
+	b := make([]byte, size)
+	binary.LittleEndian.PutUint32(b[0:4], magic)
+	binary.LittleEndian.PutUint32(b[4:8], 0x000001ff)   // permitted, low word
+	binary.LittleEndian.PutUint32(b[12:16], 0x000001ff) // inheritable, low word
+	if rootid >= 0 {
+		binary.LittleEndian.PutUint32(b[vfsCapRootIDOffset:], uint32(rootid))
+	}
+	return b
+}
+
+func TestNormalizeCapabilityRootID(t *testing.T) {
+	// container 0..65535 maps to host 1000000..1065535
+	mappings := idtools.NewIDMappingsFromMaps(
+		[]idtools.IDMap{{ContainerID: 0, HostID: 1000000, Size: 65536}},
+		[]idtools.IDMap{{ContainerID: 0, HostID: 1000000, Size: 65536}},
+	)
+
+	t.Run("v3 owned by container root (host id 1000000) is downgraded to v2 and keeps its flags", func(t *testing.T) {
+		out, err := normalizeCapabilityRootID(mappings, makeVfsCap(1000000))
+		require.NoError(t, err)
+		require.Len(t, out, vfsCapDataSizeV2)
+		magic := binary.LittleEndian.Uint32(out[0:4])
+		assert.Equal(t, uint32(vfsCapRevision2), magic&vfsCapRevisionMask)
+		assert.Equal(t, uint32(0x01), magic&0x01, "effective flag preserved")
+		assert.Equal(t, uint32(0x000001ff), binary.LittleEndian.Uint32(out[4:8]), "permitted set preserved")
+		assert.Equal(t, uint32(0x000001ff), binary.LittleEndian.Uint32(out[12:16]), "inheritable set preserved")
+	})
+
+	t.Run("v3 owned by a non-root container id keeps v3 with the container rootid", func(t *testing.T) {
+		out, err := normalizeCapabilityRootID(mappings, makeVfsCap(1000123))
+		require.NoError(t, err)
+		require.Len(t, out, vfsCapDataSizeV3)
+		assert.Equal(t, uint32(vfsCapRevision3), binary.LittleEndian.Uint32(out[0:4])&vfsCapRevisionMask)
+		assert.Equal(t, uint32(123), binary.LittleEndian.Uint32(out[vfsCapRootIDOffset:]))
+	})
+
+	t.Run("v3 with an unmapped rootid is an error", func(t *testing.T) {
+		_, err := normalizeCapabilityRootID(mappings, makeVfsCap(5))
+		assert.Error(t, err)
+	})
+
+	t.Run("v2 value is returned unchanged", func(t *testing.T) {
+		in := makeVfsCap(-1)
+		out, err := normalizeCapabilityRootID(mappings, in)
+		require.NoError(t, err)
+		assert.Equal(t, in, out)
+	})
+
+	t.Run("empty mappings return the value unchanged", func(t *testing.T) {
+		in := makeVfsCap(1000000)
+		out, err := normalizeCapabilityRootID(&idtools.IDMappings{}, in)
+		require.NoError(t, err)
+		assert.Equal(t, in, out)
+		out, err = normalizeCapabilityRootID(nil, in)
+		require.NoError(t, err)
+		assert.Equal(t, in, out)
+	})
+
+	t.Run("malformed value is returned unchanged", func(t *testing.T) {
+		in := []byte{0x00, 0x01, 0x02}
+		out, err := normalizeCapabilityRootID(mappings, in)
+		require.NoError(t, err)
+		assert.Equal(t, in, out)
+	})
 }

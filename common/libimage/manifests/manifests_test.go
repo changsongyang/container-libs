@@ -52,12 +52,12 @@ type listPtr = *list
 const (
 	listImageName = "foo"
 
-	otherListImage          = "docker://registry.k8s.io/pause:3.1"
-	otherListDigest         = "sha256:f78411e19d84a252e53bff71a4407a5686c46983a2c2eeed83929b888179acea"
-	otherListAmd64Digest    = "sha256:59eec8837a4d942cc19a52b8c09ea75121acc38114a2c68b98983ce9356b8610"
-	otherListArm64Digest    = "sha256:f365626a556e58189fc21d099fc64603db0f440bff07f77c740989515c544a39"
-	otherListPpc64Digest    = "sha256:bcf9771c0b505e68c65440474179592ffdfa98790eb54ffbf129969c5e429990"
-	otherListInstanceDigest = "docker://registry.k8s.io/pause@sha256:f365626a556e58189fc21d099fc64603db0f440bff07f77c740989515c544a39"
+	otherListImage          = "docker://quay.io/libpod/k8s-pause:3.5-nowin"
+	otherListDigest         = "sha256:7b836454ece3b180021655dbafcf0d7cc1b0ad77015700cee53700a0009f5324"
+	otherListAmd64Digest    = "sha256:369201a612f7b2b585a8e6ca99f77a36bcdbd032463d815388a96800b63ef2c8"
+	otherListArm64Digest    = "sha256:76ca2030ac3433ab5bbcfdea286b0876b129fc276e0f9d2811674141ea7bab6b"
+	otherListPpc64Digest    = "sha256:95e406e45b39993dc89f964ab1ab42db30369bd3406c1b11ef2129ab18d9c7bb"
+	otherListInstanceDigest = "docker://quay.io/libpod/k8s-pause@sha256:76ca2030ac3433ab5bbcfdea286b0876b129fc276e0f9d2811674141ea7bab6b"
 )
 
 func TestSaveLoad(t *testing.T) {
