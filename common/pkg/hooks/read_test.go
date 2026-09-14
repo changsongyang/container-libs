@@ -66,7 +66,7 @@ func TestBadFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("unexpected success")
 	}
-	assert.Regexp(t, "^parsing hook \"[^\"]*hook.json\": 1.0.0: json: cannot unmarshal string into Go struct field Hook.hook of type specs.Hook$", err.Error())
+	assert.Regexp(t, "^parsing hook \"[^\"]*hook.json\": 1.0.0: json: cannot unmarshal string into Go struct field (Hook)?\\.hook of type specs.Hook$", err.Error())
 }
 
 func TestGoodBytes(t *testing.T) {
@@ -107,7 +107,7 @@ func TestInvalidCurrentJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("unexpected success")
 	}
-	assert.Regexp(t, "^1.0.0: json: cannot unmarshal string into Go struct field Hook.hook of type specs.Hook$", err.Error())
+	assert.Regexp(t, "^1.0.0: json: cannot unmarshal string into Go struct field (Hook)?\\.hook of type specs.Hook$", err.Error())
 }
 
 func TestGoodDir(t *testing.T) {
