@@ -36,7 +36,7 @@ func TestEnsureRemoveAllWithFile(t *testing.T) {
 
 func TestEnsureRemoveAllWithMount(t *testing.T) {
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		t.Skip("mount not supported on Windows / macOS")
+		t.Skipf("mount not supported on %s", runtime.GOOS)
 	}
 
 	dir1 := t.TempDir()
