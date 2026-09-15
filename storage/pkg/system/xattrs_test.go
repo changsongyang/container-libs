@@ -85,7 +85,7 @@ func TestXattrs(t *testing.T) {
 			continue
 		}
 		got, err := Lgetxattr(tc.path, tc.attr)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, tc.want, got)
 	}
 
