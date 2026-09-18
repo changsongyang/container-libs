@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   path-filter:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       all: ${{ steps.filter.outputs.all }}
       storage: ${{ steps.filter.outputs.storage }}
@@ -73,7 +73,7 @@ jobs:
       github.event_name != 'pull_request' ||
       needs.path-filter.outputs.all == 'true' ||
       needs.path-filter.outputs.storage == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     name: "Storage: Cross"
     steps:
@@ -94,7 +94,7 @@ jobs:
       github.event_name != 'pull_request' ||
       needs.path-filter.outputs.all == 'true' ||
       needs.path-filter.outputs.image == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     name: "Image: Cross"
     steps:
@@ -159,7 +159,7 @@ jobs:
       - image-cross
       - image-test
       - common-test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check all required jobs
         run: |
